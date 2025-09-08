@@ -16,7 +16,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginForm() {
   const [error, setError] = useState<string>("");
   const router = useRouter();
-//   const login = useAuthStore((state) => state.login);
+  //   const login = useAuthStore((state) => state.login);
   const [loading, setLoading] = useState(false);
 
   // forgot password modal
@@ -59,6 +59,9 @@ export default function LoginForm() {
 
   // login submit
   const onSubmit = async (data: LoginFormData) => {
+    setError("");
+    setLoading(true);
+
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE}/api/auth/login`,
@@ -70,15 +73,22 @@ export default function LoginForm() {
       );
 
       const returned = await res.json();
+
       if (!res.ok) {
         setError(returned.error || "Something went wrong");
         return;
       }
 
-    //   login(returned.user.username, returned.user.id);
+      // ✅ Store JWT and user info
+      localStorage.setItem("token", returned.token);
+      localStorage.setItem("user", JSON.stringify(returned.user)); // optional
+
+      // redirect to dashboard
       router.push("/dashboard");
-    } catch {
+    } catch (err) {
       setError("Server error. Please try again later.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,7 +137,7 @@ export default function LoginForm() {
               </p>
             )}
 
-            <div className="text-right mt-1">
+            {/* <div className="text-right mt-1">
               <button
                 type="button"
                 onClick={() => setShowForgotPasswordModal(true)}
@@ -135,7 +145,7 @@ export default function LoginForm() {
               >
                 Forgot password?
               </button>
-            </div>
+            </div> */}
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -146,7 +156,7 @@ export default function LoginForm() {
             disabled={isSubmitting}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
           >
-            {isSubmitting ? (
+            {isSubmitting || loading ? (
               <>
                 <Loader2 className="animate-spin h-5 w-5" />
                 Logging in...
