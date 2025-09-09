@@ -93,10 +93,10 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex items-center justify-center h-[90vh] bg-gradient-to-br from-blue-50 to-white px-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg p-8 border border-blue-100">
+    <div className="h-screen w-screen bg-[url(/LoginPage2.jpg)] bg-cover bg-contain bg-[position:50%_85%] flex items-center justify-end px-4">
+      <div className="bg-black/50 backdrop-blur-md w-full h-[70vh] max-w-md lg:max-w-sm rounded-xl shadow-md p-6 border border-gray-800 text-white">
         {/* Header */}
-        <h2 className="text-3xl font-bold text-center text-blue-700 mb-6">
+        <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 bg-clip-text text-transparent mb-6">
           Welcome Back
         </h2>
 
@@ -104,17 +104,17 @@ export default function LoginForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-100 mb-1">
               Email
             </label>
             <input
               {...register("email")}
               type="email"
               placeholder="Enter your email"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-200"
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-rose-400 text-sm mt-1">
                 {errors.email.message}
               </p>
             )}
@@ -122,17 +122,17 @@ export default function LoginForm() {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-100 mb-1">
               Password
             </label>
             <input
               {...register("password")}
               type="password"
               placeholder="Enter your password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-200 "
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-rose-400 text-sm mt-1">
                 {errors.password.message}
               </p>
             )}
@@ -148,13 +148,13 @@ export default function LoginForm() {
             </div> */}
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-rose-400 text-sm">{error}</p>}
 
           {/* Submit */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-600 to-blue-700 text-white py-2.5 rounded-lg hover:from-cyan-600 hover:to-blue-800 transition"
           >
             {isSubmitting || loading ? (
               <>
@@ -166,9 +166,17 @@ export default function LoginForm() {
             )}
           </button>
         </form>
+        {/*    <div className="absolute right-10 top-1/3 text-white text-xl max-w-md">
+          <p className="font-semibold">
+            "Speak up for your street. We’ll make sure it’s heard."
+          </p>
+          <p className="mt-2 text-sm">
+            Empowering citizens to build a better Bharat.
+          </p>
+        </div> */}
 
         {/* Register link */}
-        <p className="text-sm text-center text-gray-600 mt-6">
+        <p className="text-sm text-center text-gray-300 mt-6">
           New to JanBol?{" "}
           <Link
             href="/register"
@@ -178,7 +186,6 @@ export default function LoginForm() {
           </Link>
         </p>
       </div>
-
       {/* Forgot Password Modal */}
       <Transition show={showForgotPasswordModal}>
         <div className="fixed inset-0 z-50 flex items-center justify-center">
