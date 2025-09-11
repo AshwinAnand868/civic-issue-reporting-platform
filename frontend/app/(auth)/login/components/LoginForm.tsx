@@ -94,7 +94,7 @@ export default function LoginForm() {
 
   return (
     <div className="h-screen w-screen bg-[url(/LoginPage2.jpg)] bg-cover bg-contain bg-[position:50%_85%] flex items-center justify-end px-4">
-      <div className="bg-black/50 backdrop-blur-md w-full h-[70vh] max-w-md lg:max-w-sm rounded-xl shadow-md p-6 border border-gray-800 text-white">
+      <div className="bg-black/50 backdrop-blur-md w-full h-[70vh] max-w-md lg:Kmax-w-sm rounded-xl shadow-md p-6 border border-gray-800 text-white ">
         {/* Header */}
         <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 bg-clip-text text-transparent mb-6">
           Welcome Back
