@@ -78,7 +78,7 @@ export default function RegistrationForm() {
   };
 
   return (
-    <div className="bg-white sm:rounded-2xl">
+    <div className="bg-transparent sm:rounded-2xl">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="shadow-md p-6 space-y-4"
@@ -89,7 +89,7 @@ export default function RegistrationForm() {
 
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium mb-1">Full Name</label>
+          <label className="block text-sm font-bold mb-1">Full Name</label>
           <input
             {...register("name")}
             className="w-full p-2 border border-gray-300 rounded"
@@ -101,7 +101,7 @@ export default function RegistrationForm() {
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label className="block text-sm font-bold mb-1">Email</label>
           <input
             {...register("email")}
             type="email"
@@ -114,7 +114,7 @@ export default function RegistrationForm() {
 
         {/* Phone */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="block text-sm font-bold mb-1">
             Phone (optional)
           </label>
           <input
@@ -129,7 +129,7 @@ export default function RegistrationForm() {
 
         {/* Address */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="block text-sm font-bold mb-1">
             Address (optional)
           </label>
           <input
@@ -144,7 +144,7 @@ export default function RegistrationForm() {
 
         {/* Role */}
         <div>
-          <label className="block text-sm font-medium mb-1">Role</label>
+          <label className="block text-sm font-bold mb-1">Role</label>
           <select
             {...register("role")}
             className="w-full p-2 border border-gray-300 rounded"
@@ -182,7 +182,7 @@ export default function RegistrationForm() {
 
         {/* Password */}
         <div>
-          <label className="block text-sm font-medium mb-1">Password</label>
+          <label className="block text-sm font-bold mb-1">Password</label>
           <input
             {...register("password")}
             type="password"
@@ -200,7 +200,7 @@ export default function RegistrationForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex items-center justify-center gap-2 cursor-pointer w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center font-bold justify-center gap-2 cursor-pointer w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
           {isSubmitting ? (
             <>
@@ -212,7 +212,7 @@ export default function RegistrationForm() {
           )}
         </button>
 
-        <p className="text-sm text-center text-gray-700">
+        <p className="text-sm text-center font-bold text-white-700">
           Already part of JanBol?{" "}
           <Link
             href="/login"
