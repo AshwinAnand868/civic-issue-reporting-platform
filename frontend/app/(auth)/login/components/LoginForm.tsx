@@ -84,7 +84,7 @@ export default function LoginForm() {
       localStorage.setItem("user", JSON.stringify(returned.user)); // optional
 
       // redirect to dashboard
-      router.push("/dashboard");
+      router.push("/report-issue");
     } catch (err) {
       setError("Server error. Please try again later.");
     } finally {
