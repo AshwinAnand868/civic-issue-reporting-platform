@@ -82,7 +82,7 @@ export default function LoginForm() {
       // ✅ Store JWT and user info
       localStorage.setItem("token", returned.token);
       localStorage.setItem("user", JSON.stringify(returned.user)); // optional
-
+      console.log(localStorage.getItem("user"));
       // redirect to dashboard
       router.push("/report-issue");
     } catch (err) {
