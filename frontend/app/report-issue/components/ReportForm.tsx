@@ -269,7 +269,7 @@ export default function ReportForm() {
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}
               >
-                {recording ? "⏹ Stop Recording" : "🎤 Record Voice"}
+                {recording ? "⏹ Stop Recording" : " Record Voice"}
               </button>
               {recordedAudio && <audio controls src={recordedAudio} className="mt-2 w-full" />}
             </div>
@@ -291,7 +291,7 @@ export default function ReportForm() {
                 Submitting...
               </>
             ) : (
-              "🚀 Submit Issue"
+              "Submit Issue"
             )}
           </button>
         </form>
