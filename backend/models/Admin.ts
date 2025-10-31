@@ -1,21 +1,21 @@
-// backend/models/Citizen.ts
+// backend/models/Admin.ts
 
 import mongoose, { Document, Schema, Types } from "mongoose";
 
-// The Citizen schema only contains fields relevant to a regular user
-export interface IUser extends Document {
+// The Admin schema includes department_id and a fixed role
+export interface IAdmin extends Document {
   _id: Types.ObjectId;
   name: string;
   email: string;
   phone?: string;
   password_hash: string;
-  address?: string;
-  role: "citizen"; // Fixed role for security
+  role: "admin"; // Fixed role for security
+  department_id: mongoose.Types.ObjectId; // MANDATORY for admins
   createdAt: Date;
   updatedAt: Date;
 }
 
-const CitizenSchema: Schema<IUser> = new Schema(
+const AdminSchema: Schema<IAdmin> = new Schema(
   {
     name: { type: String, required: true, trim: true },
     email: {
@@ -30,18 +30,19 @@ const CitizenSchema: Schema<IUser> = new Schema(
       type: String,
       required: true,
     },
-    address: {
-      type: String,
-      required: false,
-    },
     role: {
       type: String,
-      enum: ["citizen"],
-      default: "citizen",
+      enum: ["admin"],
+      default: "admin",
+      required: true,
+    },
+    department_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Department",
       required: true,
     },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IUser>("Citizen", CitizenSchema);
+export default mongoose.model<IAdmin>("Admin", AdminSchema);
