@@ -6,12 +6,15 @@ import { Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useRouter } from "next/navigation"; // ✅ Added for redirect
 
 type ReportFormData = z.infer<typeof reportSchema>;
 
 export default function ReportForm() {
+  const router = useRouter(); // ✅ Initialize router
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
+  const [redirecting, setRedirecting] = useState<boolean>(false); // ✅ for loader before redirect
 
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -49,6 +52,7 @@ export default function ReportForm() {
   const onSubmit = async (data: ReportFormData) => {
     setError("");
     setSuccess("");
+    setRedirecting(false);
 
     try {
       const token = localStorage.getItem("token");
@@ -74,6 +78,12 @@ export default function ReportForm() {
       }
 
       setSuccess("✅ Issue reported successfully!");
+
+      // ✅ Redirect after short delay
+      setTimeout(() => {
+        setRedirecting(true);
+        router.push("/dashboard/citizen"); // 🔁 change route if needed
+      }, 1500);
     } catch {
       setError("Server error. Please try again later.");
     }
@@ -171,8 +181,16 @@ export default function ReportForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#e6f0ff] p-4">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-blue-100">
+    <div
+      className="min-h-screen flex items-center justify-center 
+                 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200
+                 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 
+                 p-6 transition-colors duration-500"
+    >
+      <div
+        className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl 
+                   border border-blue-100 p-8 w-full max-w-lg"
+      >
         <h2 className="text-3xl font-bold text-blue-700 mb-6 text-center">
           📝 Report an Issue
         </h2>
@@ -180,49 +198,75 @@ export default function ReportForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Title */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Title
+            </label>
             <input
               {...register("title")}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none placeholder-gray-400"
+              className="w-full p-3 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-blue-400 focus:border-blue-400 
+                         outline-none placeholder:text-gray-600 text-gray-800"
               placeholder="Enter issue title"
             />
-            {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
+            {errors.title && (
+              <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
+            )}
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
               {...register("description")}
               rows={4}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none placeholder-gray-400"
+              className="w-full p-3 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-blue-400 focus:border-blue-400 
+                         outline-none placeholder:text-gray-600 text-gray-800"
               placeholder="Describe the issue in detail"
             />
-            {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
+            {errors.description && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.description.message}
+              </p>
+            )}
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Category
+            </label>
             <select
               {...register("category")}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white"
+              className="w-full p-3 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-blue-400 focus:border-blue-400 
+                         outline-none bg-white text-gray-800"
             >
               <option value="">Select Category</option>
               <option value="Sanitation">Sanitation</option>
               <option value="Roads">Roads</option>
               <option value="Electricity">Electricity</option>
             </select>
-            {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>}
+            {errors.category && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.category.message}
+              </p>
+            )}
           </div>
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Priority
+            </label>
             <select
               {...register("priority")}
               defaultValue="Medium"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white"
+              className="w-full p-3 border border-gray-300 rounded-lg 
+                         focus:ring-2 focus:ring-blue-400 focus:border-blue-400 
+                         outline-none bg-white text-gray-800"
             >
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
@@ -232,7 +276,9 @@ export default function ReportForm() {
 
           {/* Location */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Location</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Location
+            </label>
             <button
               type="button"
               onClick={handleDetectLocation}
@@ -241,24 +287,32 @@ export default function ReportForm() {
               📍 Detect My Location
             </button>
             {errors.location && (
-              <p className="text-red-500 text-sm mt-1">{errors.location.message as string}</p>
+              <p className="text-red-500 text-sm mt-1">
+                {errors.location.message as string}
+              </p>
             )}
           </div>
 
           {/* Photo Upload */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Upload Photo</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Upload Photo
+            </label>
             <input
               type="file"
               accept="image/*"
               onChange={handleFileUpload}
-              className="w-full text-gray-600"
+              className="w-full text-gray-800 file:mr-3 file:py-2 file:px-4 file:rounded-lg 
+                         file:border-0 file:text-sm file:font-semibold file:bg-blue-100 
+                         file:text-blue-700 hover:file:bg-blue-200"
             />
           </div>
 
           {/* Voice Recording */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Voice Message (optional)</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Voice Message (optional)
+            </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -269,21 +323,39 @@ export default function ReportForm() {
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}
               >
-                {recording ? "⏹ Stop Recording" : " Record Voice"}
+                {recording ? "⏹ Stop Recording" : "🎙️ Record Voice"}
               </button>
-              {recordedAudio && <audio controls src={recordedAudio} className="mt-2 w-full" />}
+              {recordedAudio && (
+                <audio controls src={recordedAudio} className="mt-2 w-full" />
+              )}
             </div>
           </div>
 
           {/* Error / Success */}
-          {error && <p className="text-red-600 text-sm font-medium text-center">{error}</p>}
-          {success && <p className="text-green-600 text-sm font-medium text-center">{success}</p>}
+          {error && (
+            <p className="text-red-600 text-sm font-medium text-center">{error}</p>
+          )}
+          {success && (
+            <p className="text-green-600 text-sm font-medium text-center">
+              {success}
+            </p>
+          )}
+
+          {/* Redirect loader */}
+          {redirecting && (
+            <div className="flex items-center justify-center gap-2 text-blue-600 font-medium">
+              <Loader2 className="animate-spin h-5 w-5" />
+              Redirecting to Dashboard...
+            </div>
+          )}
 
           {/* Submit */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-semibold transition-all duration-300 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-blue-700 
+                       hover:bg-blue-800 text-white py-3 rounded-lg font-semibold 
+                       transition-all duration-300 disabled:opacity-50"
           >
             {isSubmitting ? (
               <>

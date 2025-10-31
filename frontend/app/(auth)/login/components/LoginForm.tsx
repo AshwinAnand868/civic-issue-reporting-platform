@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { Shield } from "lucide-react";
+
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
@@ -165,7 +167,24 @@ export default function LoginForm() {
               "Login"
             )}
           </button>
-        </form>
+
+          {/* ✅ Admin Login Button */}
+          <div className="mt-4 flex justify-center">
+        <button
+         onClick={() => router.push("/admin/login")}
+          className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-800/70 border border-gray-600 rounded-lg hover:bg-gray-700 transition text-blue-300 hover:text-blue-100"
+            >
+          <Shield className="w-4 h-4" />
+    Admin Login
+  </button>
+</div>
+
+
+</form> 
+
+
+          
+      
         {/*    <div className="absolute right-10 top-1/3 text-white text-xl max-w-md">
           <p className="font-semibold">
             "Speak up for your street. We’ll make sure it’s heard."
