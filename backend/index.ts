@@ -4,6 +4,7 @@ import express, { Application, Request, Response } from "express";
 import connectDB from "./config/db";
 import authRoutes from "./routes/auth";
 import departmentRoutes from "./routes/departments";
+import issueRoutes from "./routes/issues";
 
 dotenv.config();
 connectDB();
@@ -18,6 +19,8 @@ app.use(
   })
 );
 app.use(express.json());
+
+app.use("/api/issues", issueRoutes);
 
 app.use("/api/auth", authRoutes);
 
