@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  PieChart,
-  Pie,
   Cell,
   Legend,
-  Tooltip,
+  Pie,
+  PieChart,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 
 type User = {
@@ -452,7 +452,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 p-3 overflow-y-auto text-sm space-y-2 bg-gray-50 text-gray-900">
-              {messages.map((msg, i) => (
+              {messages.map((msg : any, i) => (
                 <div
                   key={i}
                   className={`p-2 rounded-lg text-sm max-w-[80%] ${
