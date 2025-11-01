@@ -5,13 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { useEffect } from "react";
-
 type RegisterFormData = z.infer<typeof registerSchema>;
+
+// Required phrase for the voice sample
+const REQUIRED_PHRASE = "Janta";
 
 export default function RegistrationForm() {
   const [error, setError] = useState<string>("");
@@ -19,6 +20,11 @@ export default function RegistrationForm() {
   const [departments, setDepartments] = useState<
     { _id: string; name: string }[]
   >([]);
+  const [recording, setRecording] = useState(false);
+  const [audioURL, setAudioURL] = useState<string | null>(null);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunks = useRef<Blob[]>([]);
 
   const {
     register,
@@ -33,33 +39,84 @@ export default function RegistrationForm() {
   });
 
   const router = useRouter();
-
   const selectedRole = watch("role");
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
+  // Fetch departments for admin users
   useEffect(() => {
     async function fetchDepartments() {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE}/api/departments`
+          `${API_BASE}/api/departments`
         );
         const data = await res.json();
-        setDepartments(data); // data should be an array of {_id, name}
+        setDepartments(data);
       } catch (err) {
         console.error("Failed to fetch departments", err);
       }
     }
     fetchDepartments();
-  }, []);
+  }, [API_BASE]);
+
+  // Start voice recording
+  const startRecording = async () => {
+    setError("");
+    setSuccess("");
+    setVoiceFile(null); // Clear previous recording
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunks.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) audioChunks.current.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
+          const file = new File([audioBlob], "voice_sample.webm", {
+            type: "audio/webm",
+          });
+          setAudioURL(URL.createObjectURL(audioBlob));
+          setVoiceFile(file);
+          setSuccess("Voice sample recorded. Remember to speak the required phrase!");
+        };
+
+        mediaRecorder.start();
+        setRecording(true);
+    } catch (err) {
+        console.error("Microphone access error:", err);
+        setError("Microphone access denied or not available.");
+        setRecording(false);
+    }
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
 
   const onSubmit = async (data: RegisterFormData) => {
     setError("");
+    setSuccess("");
+
     try {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) =>
+        formData.append(key, value as string)
+      );
+
+      // The voice file is optional, but if recorded, it's added.
+      if (voiceFile) formData.append("voice_sample", voiceFile);
+      
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE}/api/auth/register`,
+        `${API_BASE}/api/auth/register`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: formData,
         }
       );
 
@@ -72,7 +129,8 @@ export default function RegistrationForm() {
 
       setSuccess(returned.message);
       router.push("/login");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("Server error. Please try again later.");
     }
   };
@@ -157,7 +215,7 @@ export default function RegistrationForm() {
           )}
         </div>
 
-        {/* Department ID (only for admin) */}
+        {/* Department (only if admin) */}
         {selectedRole === "admin" && (
           <div>
             <label className="block text-sm font-medium mb-1">Department</label>
@@ -193,13 +251,55 @@ export default function RegistrationForm() {
           )}
         </div>
 
-        {/* Error Message */}
+        {/* Voice Recording (UPDATED UI/Logic) */}
+        <div className="space-y-2 border p-3 rounded bg-gray-50">
+          <label className="block text-sm font-bold mb-1 text-gray-800">
+            Voice Sample (Mandatory for Reporting)
+          </label>
+          
+          <p className="text-sm text-gray-600">
+            Please speak the **exact phrase**: 
+            <span className="font-semibold text-blue-600 ml-1">"{REQUIRED_PHRASE}"</span>. 
+            This sample is required for your future voice authentication when reporting an issue.
+          </p>
+          
+          <div className="flex gap-3 items-center">
+            {/* Recording Button */}
+            <button
+              type="button"
+              onClick={recording ? stopRecording : startRecording}
+              className={`flex items-center gap-1 text-white px-3 py-1 rounded transition-colors ${
+                recording ? "bg-red-600 hover:bg-red-700" : 
+                "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              {recording ? (
+                "⏹️ Stop Speaking"
+              ) : (
+                "🎙️ Start Recording"
+              )}
+            </button>
+            
+            {/* Audio Player */}
+            {audioURL && (
+              <audio
+                controls
+                src={audioURL}
+                className="w-full rounded max-w-[200px]"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Error / Success */}
         {error && <p className="text-red-500 text-sm">{error}</p>}
+        {success && <p className="text-green-600 text-sm">{success}</p>}
+
 
         {/* Submit */}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting} // NOTE: You may want to disable if voiceFile is null
           className="flex items-center font-bold justify-center gap-2 cursor-pointer w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
           {isSubmitting ? (
