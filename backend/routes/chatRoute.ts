@@ -1,22 +1,22 @@
-// routes/chatRoute.ts
 import express, { Request, Response } from "express";
 import { askGemini } from "../ChatBot";
 
 const router = express.Router();
 
-router.post("/chat", async (req: Request, res: Response) => {
-  const { message } = req.body;
+router.post("/", async (req: Request, res: Response) => {
+  try {
+    const { message } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const aiResponse = await askGemini(message);
+    res.json({ reply: aiResponse });
+  } catch (error) {
+    console.error("Chat Route Error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  const reply = await askGemini(
-    `You are JanBol, a civic issue reporting assistant. 
-    Help the user with their concern: ${message}`
-  );
-
-  res.json({ reply });
 });
 
 export default router;
