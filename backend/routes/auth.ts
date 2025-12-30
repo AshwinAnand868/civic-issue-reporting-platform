@@ -127,21 +127,20 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// --- 1. ADMIN LOGIN ROUTE (/api/auth/admin/login) ---
 router.post("/admin/login", async (req: Request, res: Response) => {
     const { email, password } = req.body;
+    console.log("In admin route");
 
     try {
-        // Attempt to find user ONLY in the Admin collection
         const user = await Admin.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: "Invalid credentials or user not found in Admin registry." });
         }
 
-        // 1. Password Verification (REPLACE MOCK WITH REAL LOGIC)
-        if (password !== 'adminpass') return res.status(401).json({ error: "Invalid credentials" }); // MOCK
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch)
+          return res.status(401).json({ error: "Invalid email or password." });
 
-        // 2. Generate JWT Token (Role is implicitly 'admin')
         const token = jwt.sign(
             { id: user._id, role: "admin", department_id: user.department_id }, 
             process.env.JWT_SECRET as string,
