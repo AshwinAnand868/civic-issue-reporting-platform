@@ -7,8 +7,10 @@ export interface IUser extends Document {
   phone?: string;
   password_hash: string;
   address?: string;
-  role: "citizen" | "admin";
+  role: "citizen";
   department_id?: mongoose.Types.ObjectId;
+  voice_sample?: Buffer;          // raw audio bytes
+  voice_sample_mime?: string;     // MIME type like audio/webm
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,36 +18,16 @@ export interface IUser extends Document {
 const UserSchema: Schema<IUser> = new Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    phone: { type: String, required: false, trim: true },
-    password_hash: {
-      type: String,
-      required: true,
-    },
-    address: {
-      type: String,
-      required: false,
-    },
-    role: {
-      type: String,
-      enum: ["citizen", "admin"],
-      default: "citizen",
-    },
-    department_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Department",
-      required: function (this: IUser) {
-        return this.role === "admin"; // enforce department_id only for admins
-      },
-    },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    phone: { type: String, trim: true },
+    password_hash: { type: String, required: true },
+    address: { type: String },
+    role: { type: String, enum: ["citizen", "admin"], default: "citizen" },
+    department_id: { type: Schema.Types.ObjectId, ref: "Department" },
+    voice_sample: { type: Buffer },
+    voice_sample_mime: { type: String },
   },
-  { timestamps: true } // adds createdAt and updatedAt
+  { timestamps: true }
 );
 
-export default mongoose.model<IUser>("User", UserSchema);
+export default mongoose.model<IUser>("User", UserSchema);

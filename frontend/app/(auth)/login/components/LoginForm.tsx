@@ -4,7 +4,7 @@
 import { loginSchema } from "@/app/lib/validations/loginSchema";
 import { Transition, TransitionChild } from "@headlessui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Shield, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -84,7 +84,14 @@ export default function LoginForm() {
       localStorage.setItem("user", JSON.stringify(returned.user)); // optional
       console.log(localStorage.getItem("user"));
       // redirect to dashboard
-      router.push("/report-issue");
+      // we have to write if condition here if admin redirect to admin dashbaord
+      // if citizen redirect to citizen dashboard
+
+      if (returned.user.role == "admin") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push("/dashboard/citizen");
+      }
     } catch (err) {
       setError("Server error. Please try again later.");
     } finally {
@@ -93,7 +100,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[url(/LoginPage2.jpg)] bg-cover bg-contain bg-[position:50%_85%] flex items-center justify-end px-4">
+    <div className="h-screen w-screen bg-[url(/LoginPage2.jpg)] bg-contain bg-[position:50%_85%] flex items-center justify-end px-4">
       <div className="bg-black/50 backdrop-blur-md w-full h-[70vh] max-w-md lg:Kmax-w-sm rounded-xl shadow-md p-6 border border-gray-800 text-white ">
         {/* Header */}
         <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 bg-clip-text text-transparent mb-6">
@@ -165,7 +172,19 @@ export default function LoginForm() {
               "Login"
             )}
           </button>
+
+          {/* ✅ Admin Login Button */}
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => router.push("/admin/login")}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-800/70 border border-gray-600 rounded-lg hover:bg-gray-700 transition text-blue-300 hover:text-blue-100"
+            >
+              <Shield className="w-4 h-4" />
+              Admin Login
+            </button>
+          </div>
         </form>
+
         {/*    <div className="absolute right-10 top-1/3 text-white text-xl max-w-md">
           <p className="font-semibold">
             "Speak up for your street. We’ll make sure it’s heard."

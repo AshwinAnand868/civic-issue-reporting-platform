@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import router from "next/router";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -32,8 +31,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
     const token = localStorage.getItem("token");
+    const raw = localStorage.getItem("user");
 
     if (!token) {
       router.push("/login");
@@ -42,7 +41,6 @@ export default function DashboardPage() {
 
     if (raw) {
       try {
-        console.log(raw);
         setUser(JSON.parse(raw) as User);
       } catch {
         setUser(null);
@@ -53,16 +51,21 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/issues`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE}/api/issues`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error || `Failed to fetch issues (${res.status})`);
+          throw new Error(
+            body?.error || `Failed to fetch issues (${res.status})`
+          );
         }
 
         const data = (await res.json()) as Issue[];
@@ -88,7 +91,9 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <header className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold text-blue-700">My Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-blue-700">
+            My Dashboard
+          </h1>
 
           <div className="flex items-center gap-3">
             {user ? (
@@ -110,9 +115,10 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        {/* User Info Card */}
         {user && (
-          <section className="bg-white rounded-2xl shadow p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-            <div className="md:col-span-1 flex items-center gap-4">
+          <section className="bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xl">
                 {user.name.charAt(0).toUpperCase()}
               </div>
@@ -122,48 +128,54 @@ export default function DashboardPage() {
                 <div className="text-sm text-gray-500">{user.phone ?? ""}</div>
               </div>
             </div>
-
-            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard label="Total Reports" value={issues.length} />
-              <StatCard
-                label="Submitted"
-                value={issues.filter((i) => i.status === "Submitted").length}
-              />
-              <StatCard
-                label="Resolved"
-                value={issues.filter((i) => i.status === "Resolved").length}
-              />
-            </div>
           </section>
         )}
 
         {/* Issues list */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">My Reports</h2>
-            <div className="text-sm text-gray-500">{issues.length} total</div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">
+                My Reports
+              </h2>
+              <div className="text-sm text-gray-500">{issues.length} total</div>
+            </div>
+            <div>
+              <button
+                onClick={() => router.push("/report-issue")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Report Issue
+              </button>
+            </div>
           </div>
 
           {loading ? (
-            <div className="bg-white rounded-lg p-6 shadow">Loading reports…</div>
+            <div className="bg-white rounded-lg p-6 shadow">
+              Loading reports…
+            </div>
           ) : error ? (
             <div className="bg-red-50 text-red-700 p-4 rounded">{error}</div>
           ) : issues.length === 0 ? (
             <div className="bg-white rounded-lg p-6 shadow">
-              <p className="text-gray-700">You haven’t reported any issues yet.</p>
-              <button
+              <p className="text-gray-700">
+                You haven’t reported any issues yet.
+              </p>
+              {/* <button
                 onClick={() => router.push("/report")}
                 className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg"
               >
                 Report an Issue
-              </button>
+              </button> */}
             </div>
           ) : (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {issues.map((issue) => (
                 <div
                   key={issue._id}
-                  onClick={() => router.push(`/dashboard/${user?.id}/issues/${issue._id}`)}
+                  onClick={() =>
+                    router.push(`/dashboard/${user?.id}/issues/${issue._id}`)
+                  }
                   className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition"
                 >
                   {issue.photo_url ? (
@@ -180,10 +192,14 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold">{issue.title}</h3>
-                      <p className="text-sm text-gray-600 line-clamp-2">{issue.description}</p>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {issue.description}
+                      </p>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-gray-500">{new Date(issue.createdAt).toLocaleString()}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(issue.createdAt).toLocaleString()}
+                      </div>
                       <div
                         className="mt-2 inline-block px-2 py-1 rounded text-xs font-medium text-white"
                         style={{
@@ -200,7 +216,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <div className="text-gray-700">Category: {issue.category}</div>
+                    <div className="text-gray-700">
+                      Category: {issue.category}
+                    </div>
                     <div className="text-gray-500">Status: {issue.status}</div>
                   </div>
                 </div>
