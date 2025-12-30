@@ -11,7 +11,7 @@ import { z } from "zod";
 type ReportFormData = z.infer<typeof reportSchema>;
 
 // Expected phrase for voice verification
-const VERIFICATION_PHRASE = "Janta.";
+const VERIFICATION_PHRASE = "Public.";
 
 interface UserDetails {
   id: string;
@@ -542,16 +542,8 @@ const onSubmit = async (data: ReportFormData) => {
         {/* text-3xl font-bold text-blue-700 mb-6 text-center */}
         <h2 className="text-4xl font-extrabold text-center mb-8 bg-clip-text text-blue-700">
           📝 Report an Issue
-        </h2>
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium">Description</label>
-          <textarea {...register("description")} rows={4} className="w-full p-2 border border-gray-300 rounded" />
-          {errors.description && <p className="text-red-500 text-sm">{errors.description.message}</p>}
-        </div>
-        
+        </h2>        
         {/* --- VOICE AUTHENTICATION SECTION --- */}
-        <hr className="my-4" />
         <div className="space-y-3">
             <h3 className="text-lg font-bold text-gray-800">Voice Verification</h3>
             <p className="text-sm text-gray-600">
@@ -586,39 +578,30 @@ const onSubmit = async (data: ReportFormData) => {
                 )}
             </div>
         </div>
+        {error ? <p className="text-red-500 text-sm">{error}</p> 
+          :<p className="text-green-600 text-sm">{success}</p>}
         <hr className="my-4" />
         
         {/* --- VOICE RECORDING FOR ISSUE --- */}
-        <div>
-          <label className="block text-sm font-medium">Voice Message (optional)</label>
+        {/* Error / Success */}
+        <div className="mb-2">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Voice Message (optional)</label>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleIssueRecording}
               // 💡 FIX: Use the calculated helper function.
               disabled={isIssueButtonDisabled} 
-              className={`px-4 py-2 rounded ${
+              className={`px-4 py-2 rounded mb-2 ${
                 (recording && !activeRecorderRef.current?.isVerification) ? "bg-red-600" : isVerified ? "bg-blue-600" : "bg-gray-400"
               } text-white hover:opacity-90 disabled:opacity-50`}
-            >
+              >
               {(recording && !activeRecorderRef.current?.isVerification) ? "Stop Recording" : "Record Issue Voice"}
             </button>
 
             {recordedAudio && <audio controls src={recordedAudio} className="mt-2 w-full" />}
           </div>
-        </div>
-        
-        {/* Category */}
-        <div>
-          <label className="block text-sm font-medium">Category</label>
-          <select {...register("category")} className="w-full p-2 border border-gray-300 rounded">
-            <option value="">Select Category</option>
-            <option value="Sanitation">Sanitation</option>
-            <option value="Roads">Roads</option>
-            <option value="Electricity">Electricity</option>
-          </select>
-          {errors.category && <p className="text-red-500 text-sm">{errors.category.message}</p>}
-        </div>
+        </div> 
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Title */}
@@ -725,44 +708,12 @@ const onSubmit = async (data: ReportFormData) => {
             />
           </div>
 
-          {/* Voice Recording */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Voice Message (optional)
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleVoiceRecording}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  recording
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                {recording ? "⏹ Stop Recording" : " Record Voice"}
-              </button>
-              {recordedAudio && (
-                <audio controls src={recordedAudio} className="mt-2 w-full" />
-              )}
-            </div>
-          </div>
-
           {/* Error / Success */}
-          {error && (
+          {/* {error && (
             <p className="text-red-600 text-sm font-medium text-center">
               {error}
-            </p>)}
-
-        {/* Photo Upload */}
-        <div>
-          <label className="block text-sm font-medium">Upload Photo</label>
-          <input type="file" accept="image/*" onChange={handleFileUpload} className="w-full p-2 border border-gray-300 rounded" />
-        </div>
-        
-        {/* Error / Success */}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        {success && <p className="text-green-600 text-sm">{success}</p>}
+            </p>)} */}
+      
 
         {/* Submit */}
         <button 
@@ -778,11 +729,11 @@ const onSubmit = async (data: ReportFormData) => {
           ) : (
             "Submit Issue"
           )}
-          {success && (
+          {/* {success && (
             <p className="text-green-600 text-sm font-medium text-center">
               {success}
             </p>
-          )}
+          )} */}
           </button>
         </form>
       </div>

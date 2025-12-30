@@ -12,7 +12,7 @@ import { z } from "zod";
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 // Required phrase for the voice sample
-const REQUIRED_PHRASE = "Janta";
+const REQUIRED_PHRASE = "Public";
 
 export default function RegistrationForm() {
   const [error, setError] = useState<string>("");

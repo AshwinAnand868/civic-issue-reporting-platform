@@ -366,9 +366,19 @@ export default function DashboardPage() {
         {/* Issues List */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">My Reports</h2>
-            <div className="text-sm text-gray-500">
-              {filteredIssues.length} total
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">
+                My Reports
+              </h2>
+              <div className="text-sm text-gray-500 mt-2 font-bold">{issues.length} total</div>
+            </div>
+            <div>
+              <button
+                onClick={() => router.push("/report-issue")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Report Issue
+              </button>
             </div>
           </div>
 
