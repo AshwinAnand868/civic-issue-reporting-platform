@@ -10,6 +10,18 @@ import { z } from "zod";
 
 type ReportFormData = z.infer<typeof reportSchema>;
 
+<<<<<<< HEAD
+=======
+// Expected phrase for voice verification
+const VERIFICATION_PHRASE = "Public.";
+
+interface UserDetails {
+  id: string;
+  voice_base64?: string; // Stored sample voice data
+  voice_sample_mime?: string; // Mime type for sample voice
+}
+
+>>>>>>> origin/main
 // Custom Ref Type to track which recording process is active
 interface RecorderRef {
   mediaRecorder: MediaRecorder | null;
@@ -588,6 +600,7 @@ export default function ReportForm() {
       <div className="bg-white/80 backdrop-blur-lg border border-blue-200/40 shadow-2xl rounded-3xl p-10 w-full max-w-2xl transition-transform hover:scale-[1.01] duration-200">
         <h2 className="text-4xl font-extrabold text-center mb-8 bg-clip-text text-blue-700">
           📝 Report an Issue
+<<<<<<< HEAD
         </h2>
 
         {/* --- STEP 1: VOICE IDENTITY VERIFICATION --- */}
@@ -655,9 +668,46 @@ export default function ReportForm() {
                   ⚠️ Replay attack detected — please speak live!
                 </p>
               )}
+=======
+        </h2>        
+        {/* --- VOICE AUTHENTICATION SECTION --- */}
+        <div className="space-y-3">
+            <h3 className="text-lg font-bold text-gray-800">Voice Verification</h3>
+            <p className="text-sm text-gray-600">
+                To enable voice recording for the issue, please speak the exact phrase: 
+                <span className="font-semibold text-blue-600 ml-1">"{VERIFICATION_PHRASE}"</span>
+            </p>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={handleVerificationRecording}
+                    // 💡 FIX: Use the calculated helper function. Enabled when recording, or when ready to start.
+                    disabled={isVerificationButtonDisabled} 
+                    className={`px-4 py-2 rounded ${
+                        isVerified ? "bg-green-600" : isVerifying || (recording && activeRecorderRef.current?.isVerification) ? "bg-red-600" : "bg-blue-600"
+                    } text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
+                >
+                    {isVerified ? (
+                        "✅ Verified"
+                    ) : isVerifying ? (
+                        <>
+                            <Loader2 className="animate-spin h-4 w-4" />
+                            Verifying...
+                        </>
+                    ) : (recording && activeRecorderRef.current?.isVerification) ? (
+                        "Stop Speaking"
+                    ) : (
+                        "Start Verification"
+                    )}
+                </button>
+                {verificationAudioUrl && (
+                    <audio controls src={verificationAudioUrl} className="mt-2 w-full max-w-xs" />
+                )}
+>>>>>>> origin/main
             </div>
           )}
         </div>
+<<<<<<< HEAD
 
         <hr className="my-4" />
 
@@ -694,12 +744,34 @@ export default function ReportForm() {
               ) : (
                 "🎙️ Record Issue Voice"
               )}
+=======
+        {error ? <p className="text-red-500 text-sm">{error}</p> 
+          :<p className="text-green-600 text-sm">{success}</p>}
+        <hr className="my-4" />
+        
+        {/* --- VOICE RECORDING FOR ISSUE --- */}
+        {/* Error / Success */}
+        <div className="mb-2">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Voice Message (optional)</label>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleIssueRecording}
+              // 💡 FIX: Use the calculated helper function.
+              disabled={isIssueButtonDisabled} 
+              className={`px-4 py-2 rounded mb-2 ${
+                (recording && !activeRecorderRef.current?.isVerification) ? "bg-red-600" : isVerified ? "bg-blue-600" : "bg-gray-400"
+              } text-white hover:opacity-90 disabled:opacity-50`}
+              >
+              {(recording && !activeRecorderRef.current?.isVerification) ? "Stop Recording" : "Record Issue Voice"}
+>>>>>>> origin/main
             </button>
 
             {recordedAudio && (
               <audio controls src={recordedAudio} className="w-full max-w-xs h-10" />
             )}
           </div>
+<<<<<<< HEAD
 
           {/* Auto-fill indicator */}
           {autoFilled && (
@@ -709,6 +781,9 @@ export default function ReportForm() {
             </div>
           )}
         </div>
+=======
+        </div> 
+>>>>>>> origin/main
 
         <hr className="my-4" />
 
@@ -836,6 +911,7 @@ export default function ReportForm() {
           </div>
 
           {/* Error / Success */}
+<<<<<<< HEAD
           {error && <p className="text-red-500 text-sm">{error}</p>}
           {success && <p className="text-green-600 text-sm">{success}</p>}
 
@@ -865,6 +941,34 @@ export default function ReportForm() {
               Go to Dashboard
             </button>
           </div>
+=======
+          {/* {error && (
+            <p className="text-red-600 text-sm font-medium text-center">
+              {error}
+            </p>)} */}
+      
+
+        {/* Submit */}
+        <button 
+            type="submit" 
+            disabled={isSubmitting || (Boolean(currentVoiceUrl) && !isVerified)} 
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5" />
+              Submitting...
+            </>
+          ) : (
+            "Submit Issue"
+          )}
+          {/* {success && (
+            <p className="text-green-600 text-sm font-medium text-center">
+              {success}
+            </p>
+          )} */}
+          </button>
+>>>>>>> origin/main
         </form>
       </div>
     </div>
