@@ -81,9 +81,9 @@ router.post(
           department_id: newUser.department_id || null,
         },
       });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Server error" });
+    } catch (error: any) {
+      console.error("Full Registration Error:", error);
+      res.status(500).json({ error: error.message || "Server error during registration" });
     }
   }
 );
@@ -163,6 +163,113 @@ router.post("/admin/login", async (req: Request, res: Response) => {
         console.error("Admin Login Error:", error);
         return res.status(500).json({ error: "Server Error during admin login." });
     }
+});
+
+import axios from "axios";
+import FormData from "form-data";
+
+// --- VOICE LOGIN ROUTE (/api/auth/voice-login) ---
+router.post(
+  "/voice-login",
+  upload.single("voice_sample"),
+  async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || !req.file) {
+        return res
+          .status(400)
+          .json({ error: "Email and voice sample are required." });
+      }
+
+      // 1. Find user by email
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(401).json({ error: "No user found with this email." });
+      }
+
+      // 2. Ensure user has a stored voice sample
+      if (!user.voice_sample || !user.voice_sample_mime) {
+        return res
+          .status(400)
+          .json({ error: "User has not registered a voice sample." });
+      }
+
+      // The python service URL
+      const pythonServiceUrl = process.env.VOICE_SERVICE_URL || "http://127.0.0.1:8001";
+
+      // 3. Send both audio files to the Python voice-service /verify-speaker/
+      const formData = new FormData();
+
+      // file1 = stored voice sample (from DB)
+      formData.append("file1", user.voice_sample, {
+        filename: `stored_sample.${user.voice_sample_mime?.split("/")[1] || "webm"}`,
+        contentType: user.voice_sample_mime,
+      });
+
+      // file2 = live recording (from request)
+      formData.append("file2", req.file.buffer, {
+        filename: "login_sample.webm",
+        contentType: req.file.mimetype,
+      });
+
+      const verifyRes = await axios.post(
+        `${pythonServiceUrl}/verify-speaker/`,
+        formData,
+        { headers: formData.getHeaders() }
+      );
+
+      const { similarity_score, verified, replay_detection, error: pythonError } = verifyRes.data;
+
+      if (pythonError) {
+        throw new Error(`Python Service: ${pythonError}`);
+      }
+
+      console.log(`Voice Login attempt for ${email} - Score: ${similarity_score}, Verified: ${verified}, Replay: ${replay_detection?.is_replay}`);
+
+      if (!verified) {
+        return res
+          .status(401)
+          .json({ 
+            error: replay_detection?.is_replay 
+              ? "Replay attack detected. Please speak live."
+              : "Voice authentication failed. Audio does not match." 
+          });
+      }
+
+      // 6. Generate JWT token
+      const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET || "secret",
+        { expiresIn: "1d" }
+      );
+
+      // Return user info and token
+      res.json({
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+        token,
+      });
+    } catch (err: any) {
+      console.error("Voice Login error:", err.response?.data || err.message);
+      res.status(500).json({ error: "Server error during voice login." });
+    }
+  }
+);
+
+// --- DEBUG ROUTE ---
+router.get("/debug-voice", async (req: Request, res: Response) => {
+  const url = process.env.VOICE_SERVICE_URL || "http://127.0.0.1:8001";
+  try {
+    const health = await axios.get(url, { timeout: 2000 });
+    res.json({ url, status: "OK", pythonResponse: health.data });
+  } catch (err: any) {
+    res.json({ url, status: "FAIL", error: err.message });
+  }
 });
 
 export default router;

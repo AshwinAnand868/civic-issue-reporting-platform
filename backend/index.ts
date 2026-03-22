@@ -9,8 +9,10 @@ import issueRoutes from "./routes/issues";
 // import departmentRoutes from './routes/departments'; // If you have department routes
 import chatRoute from "./routes/chatRoute";
 import departmentRoutes from "./routes/departments";
+import extractFieldsRoutes from "./routes/extract-fields";
 import transcribeRoutes from "./routes/transcribe";
 import userRoutes from "./routes/user";
+import verifyVoiceRoutes from "./routes/verify-voice";
 
 // Load environment variables
 dotenv.config();
@@ -22,7 +24,7 @@ const app = express();
 
 // --- Middlewares ---
 app.use(cors()); // Configure CORS options as needed
-app.use(express.json()); // Body parser
+app.use(express.json({ limit: "50mb" })); // Body parser (increased for base64 audio)
 
 // --- Routes ---
 app.use("/api/auth", authRoutes); // Uses the modified login routes
@@ -35,6 +37,10 @@ app.use("/api/departments", departmentRoutes);
 app.use("/api/users", userRoutes);
 
 app.use("/api/transcribe", transcribeRoutes);
+
+app.use("/api/auth", verifyVoiceRoutes);
+
+app.use("/api/transcribe", extractFieldsRoutes);
 
 // Test Route
 app.get("/", (req, res) => {

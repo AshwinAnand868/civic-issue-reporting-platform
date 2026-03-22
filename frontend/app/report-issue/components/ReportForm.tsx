@@ -10,40 +10,53 @@ import { z } from "zod";
 
 type ReportFormData = z.infer<typeof reportSchema>;
 
-// Expected phrase for voice verification
-const VERIFICATION_PHRASE = "Janta.";
-
-interface UserDetails {
-  id: string;
-  voice_base64?: string; // Stored sample voice data
-  voice_sample_mime?: string; // Mime type for sample voice
-}
-
 // Custom Ref Type to track which recording process is active
 interface RecorderRef {
-    mediaRecorder: MediaRecorder | null;
-    isVerification: boolean; // True if recording verification, false if recording issue
+  mediaRecorder: MediaRecorder | null;
+  isVerification: boolean; // True if recording verification, false if recording issue
 }
 
+// -------------------------------------------------------
+// TTS Helper: Speaks text aloud using browser Speech API
+// Provides audio feedback for accessibility (illiterate users)
+// -------------------------------------------------------
+const speak = (text: string) => {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.lang = "en-IN"; // Indian English
+    window.speechSynthesis.speak(utterance);
+  }
+};
+
 export default function ReportForm() {
-  const router = useRouter(); // ✅ Initialize router
+  const router = useRouter();
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
-  const [redirecting, setRedirecting] = useState<boolean>(false); // ✅ for loader before redirect
+  const [redirecting, setRedirecting] = useState<boolean>(false);
 
-  // New state to manage verification status
+  // Verification state
   const [isVerified, setIsVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationAudioUrl, setVerificationAudioUrl] = useState<string | null>(null);
+  const [verificationAudioUrl, setVerificationAudioUrl] = useState<
+    string | null
+  >(null);
+  const [verificationScore, setVerificationScore] = useState<number | null>(null);
+  const [replayDetected, setReplayDetected] = useState<boolean>(false);
 
-  // Existing states for issue recording
+  // Issue recording state
   const [recording, setRecording] = useState(false);
-  
-  // 💡 FIX: Use a custom ref object to manage the active recorder's details
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
+
+  // Recorder refs
   const activeRecorderRef = useRef<RecorderRef | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  
+
   const [recordedAudio, setRecordedAudio] = useState<string | null>(null);
 
   const {
@@ -51,7 +64,7 @@ export default function ReportForm() {
     handleSubmit,
     formState: { errors, isSubmitting },
     setValue,
-    watch, // Use watch to check the voice_url field
+    watch,
   } = useForm<ReportFormData>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
@@ -61,18 +74,18 @@ export default function ReportForm() {
 
   const currentVoiceUrl = watch("voice_url");
 
-  // Helper function to read a Blob as a Data URL (Base64)
+  // -------------------------------------------------------
+  // Helper: Read blob as base64 data URL
+  // -------------------------------------------------------
   const blobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       const mimeType = blob.type;
       reader.onloadend = () => {
         const result = reader.result as string;
-        // AssemblyAI expects the data URI format "data:audio/webm;base64,..."
         if (result.startsWith(`data:${mimeType}`)) {
           resolve(result);
         } else {
-          // Fallback just in case
           resolve(`data:${mimeType};base64,${btoa(result)}`);
         }
       };
@@ -81,61 +94,44 @@ export default function ReportForm() {
     });
   };
 
-  // 🆕 General Polling Helper
-  const pollTranscription = async (token: string, API_BASE: string, transcriptId: string, name: string): Promise<string> => {
-    let text = "";
-    while (true) {
-      const checkRes = await fetch(`${API_BASE}/api/transcribe/${transcriptId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const checkData = await checkRes.json();
-      
-      if (!checkRes.ok) {
-        throw new Error(`Polling failed for ${name}: ${checkData.error || checkRes.statusText}`);
-      }
-      
-      if (checkData.status === "completed") {
-        text = checkData.text;
-        break;
-      } else if (checkData.status === "error") {
-        throw new Error(`${name} transcription failed. Error detail: ${checkData.error}`);
-      } else {
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    }
-    return text;
-  };
-
-  // Helper to start/stop recording for any purpose
+  // -------------------------------------------------------
+  // Helper: Start/Stop recording for any purpose
+  // -------------------------------------------------------
   const startStopRecording = async (
     onStopCallback: (blob: Blob, url: string) => Promise<void>,
     isVerification: boolean
   ) => {
     setError("");
-    
-    // 1. STOP Logic (if currently recording)
-    if (recording && activeRecorderRef.current?.isVerification === isVerification) {
-        activeRecorderRef.current.mediaRecorder?.stop();
-        // The rest of the stop logic is handled in recorder.onstop
-        return;
+
+    // STOP Logic
+    if (
+      recording &&
+      activeRecorderRef.current?.isVerification === isVerification
+    ) {
+      activeRecorderRef.current.mediaRecorder?.stop();
+      return;
     }
-    
-    // 2. START Logic (if not recording or recording for the other purpose)
-    
-    // If the other process is running, we should not start.
-    if (recording && activeRecorderRef.current?.isVerification !== isVerification) {
-        setError("Please stop the active recording before starting a new one.");
-        return;
+
+    // Prevent starting if the other process is running
+    if (
+      recording &&
+      activeRecorderRef.current?.isVerification !== isVerification
+    ) {
+      const msg = "Please stop the active recording before starting a new one.";
+      setError(msg);
+      speak(msg);
+      return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
-
       const recorder = new MediaRecorder(stream);
-      
-      // Update global ref to track the active recording
-      activeRecorderRef.current = { mediaRecorder: recorder, isVerification: isVerification };
+
+      activeRecorderRef.current = {
+        mediaRecorder: recorder,
+        isVerification: isVerification,
+      };
 
       const chunks: Blob[] = [];
 
@@ -150,9 +146,10 @@ export default function ReportForm() {
           await onStopCallback(blob, url);
         } catch (err) {
           console.error("Audio processing failed:", err);
-          setError("Failed to process audio.");
+          const msg = "Failed to process audio.";
+          setError(msg);
+          speak(msg);
         } finally {
-          // Cleanup shared resources
           if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach((t) => t.stop());
             mediaStreamRef.current = null;
@@ -165,22 +162,35 @@ export default function ReportForm() {
       if (isVerification) {
         setVerificationAudioUrl(null);
         setIsVerified(false);
+        setVerificationScore(null);
+        setReplayDetected(false);
       } else {
         setRecordedAudio(null);
-        setValue("voice_url", undefined); // Clear the voice URL field for the issue
+        setValue("voice_url", undefined);
       }
-      
+
       recorder.start();
       setRecording(true);
-      
+
+      // TTS feedback
+      if (isVerification) {
+        speak("Recording started. Please speak now for voice verification.");
+      } else {
+        speak("Recording started. Please describe your issue now.");
+      }
     } catch (err) {
       console.error("Microphone error:", err);
-      setError("Microphone access denied or not available.");
+      const msg = "Microphone access denied or not available.";
+      setError(msg);
+      speak(msg);
       setRecording(false);
     }
   };
 
-  // 1. Step 1: Handle Verification Recording
+  // -------------------------------------------------------
+  // Step 1: Handle Verification Recording
+  // Uses biometric speaker verification via the Python service
+  // -------------------------------------------------------
   const handleVerificationRecording = () => {
     startStopRecording(handleVerificationStop, true);
   };
@@ -188,144 +198,227 @@ export default function ReportForm() {
   const handleVerificationStop = async (blob: Blob, url: string) => {
     setVerificationAudioUrl(url);
     setIsVerifying(true);
-    setSuccess("Audio recorded. Verifying voice signature...");
-    
-    const verificationBase64 = await blobToBase64(blob);
-    
-    await verifyVoice(verificationBase64, blob.type);
-    setIsVerifying(false);
-  };
+    setSuccess("Audio recorded. Verifying your voice identity...");
+    speak("Audio recorded. Verifying your voice identity. Please wait.");
 
-  // 🆕 Voice Verification Logic
-  const verifyVoice = async (verificationBase64: string, verificationMime: string) => {
-    setError("");
-    setIsVerified(false);
-    
-    const token = localStorage.getItem("token");
-    const rawUser = localStorage.getItem("user");
-    if (!token || !rawUser) {
-        setError("You must be logged in to verify voice.");
-        return;
-    }
-
-    const user = JSON.parse(rawUser); 
-    const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-    
     try {
-        // 1. Fetch user's stored sample voice details
-        const userDetailsRes = await fetch(`${API_BASE}/api/users/${user.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+      const token = localStorage.getItem("token");
+      if (!token) {
+        const msg = "You must be logged in to verify voice.";
+        setError(msg);
+        speak(msg);
+        setIsVerifying(false);
+        return;
+      }
 
-        if (!userDetailsRes.ok) {
-            const errorData = await userDetailsRes.json();
-            throw new Error(errorData.error || "Failed to fetch user details.");
-        }
-        
-        const userDetails: UserDetails = await userDetailsRes.json();
-        const sampleVoiceBase64 = userDetails.voice_base64;
-        const sampleVoiceMime = userDetails.voice_sample_mime;
+      // Send the voice sample to the biometric verification endpoint
+      const formData = new FormData();
+      formData.append("voice_sample", blob, "verification_sample.webm");
 
-        if (!sampleVoiceBase64 || !sampleVoiceMime) {
-            setError("Sample voice data not found. Please register your voice first.");
-            return;
-        }
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const res = await fetch(`${API_BASE}/api/auth/verify-voice`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-        // --- Transcribe Sample Voice (Stored) ---
-        const sampleRes = await fetch(`${API_BASE}/api/transcribe/sample-voice`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ audio_base64: sampleVoiceBase64, audio_mime: sampleVoiceMime }), 
-        });
-        
-        if (!sampleRes.ok) throw new Error(`Sample transcription failed to start. Status: ${sampleRes.status}`);
-        const { transcriptId: sampleId } = await sampleRes.json();
+      const data = await res.json();
 
-        // --- Transcribe Verification Voice (New recording) ---
-        const verificationRes = await fetch(`${API_BASE}/api/transcribe/sample-voice`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ 
-              audio_base64: verificationBase64,
-              audio_mime: verificationMime,
-            }), 
-        });
+      if (!res.ok) {
+        const msg = data.error || "Voice verification failed.";
+        setError(msg);
+        speak(msg);
+        setIsVerifying(false);
+        return;
+      }
 
-        if (!verificationRes.ok) throw new Error(`Verification transcription failed to start. Status: ${verificationRes.status}`);
-        const { transcriptId: verificationId } = await verificationRes.json();
+      setVerificationScore(data.similarity_score);
+      setReplayDetected(data.replay_detection?.is_replay || false);
 
-        // --- Poll Transcriptions and Compare ---
-        
-        let sampleText = await pollTranscription(token, API_BASE!, sampleId, "Stored Sample");
-        let verificationText = await pollTranscription(token, API_BASE!, verificationId, "Verification Phrase");
-        console.log(sampleText);
-        console.log(verificationText);
-        // 1. Clean and normalize texts for comparison
-        const cleanSampleText = sampleText.trim().toLowerCase();
-        const cleanVerificationText = verificationText.trim().toLowerCase();
-        // const cleanVerificationPhrase = VERIFICATION_PHRASE.toLowerCase().trim();
-        
-        // // 2. Phrase check (Did the user say the right words?)
-        // if (cleanVerificationText !== cleanVerificationPhrase) {
-        //     setError(`Verification failed: You must say exactly "${VERIFICATION_PHRASE}". You said: "${verificationText}"`);
-        //     return;
-        // }
-        
-        // 3. Voice check 
-        const isSame = cleanVerificationText === cleanSampleText;
-        
-        if (!isSame) {
-            setError("Verification failed: Acoustic profile mismatch. Try again, speaking clearly.");
-            return;
-        }
-
+      if (data.verified) {
         setIsVerified(true);
-        setSuccess("✅ Voice verified successfully! You can now record your issue description.");
-        
+        const msg =
+          "Voice verified successfully! You can now record your complaint.";
+        setSuccess(`✅ ${msg} (Similarity: ${(data.similarity_score * 100).toFixed(1)}%)`);
+        speak(msg);
+      } else {
+        setIsVerified(false);
+        const msg = data.replay_detection?.is_replay
+          ? "Replay attack detected! Please speak live into the microphone. Do not play a recording."
+          : "Voice verification failed. Your voice does not match the registered sample. Please try again.";
+        setError(msg);
+        speak(msg);
+      }
     } catch (err: any) {
-        console.error(err);
-        setError(err.message || "Server error during voice verification.");
+      console.error(err);
+      const msg = err.message || "Server error during voice verification.";
+      setError(msg);
+      speak(msg);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  // 2. Step 2: Handle Issue Recording
+  // -------------------------------------------------------
+  // Step 2: Handle Issue Recording
+  // Records, uploads to Cloudinary, then auto-fills form
+  // -------------------------------------------------------
   const handleIssueRecording = () => {
     if (!isVerified) {
-        setError("You must verify your voice first by speaking the required phrase.");
-        return;
+      const msg =
+        "You must verify your voice first before recording your complaint.";
+      setError(msg);
+      speak(msg);
+      return;
     }
     startStopRecording(handleIssueStop, false);
   };
 
   const handleIssueStop = async (blob: Blob, url: string) => {
     setRecordedAudio(url);
-    setSuccess("Issue audio recorded. Uploading to Cloudinary...");
+    setSuccess("Issue audio recorded. Uploading...");
+    speak("Issue audio recorded. Uploading and processing your complaint.");
 
-    const formData = new FormData();
-    formData.append("file", blob);
-    formData.append("upload_preset", "unsigned_preset");
+    // 1. Upload to Cloudinary
+    const cloudinaryFormData = new FormData();
+    cloudinaryFormData.append("file", blob);
+    cloudinaryFormData.append("upload_preset", "unsigned_preset");
 
     try {
-      const res = await fetch(
+      const cloudRes = await fetch(
         `https://api.cloudinary.com/v1_1/diqacdink/video/upload`,
-        { method: "POST", body: formData }
+        { method: "POST", body: cloudinaryFormData }
       );
 
-      const data = await res.json();
-      if (data && data.secure_url) {
-        setValue("voice_url", data.secure_url);
-        setSuccess("✅ Issue audio uploaded successfully!");
+      const cloudData = await cloudRes.json();
+      if (cloudData && cloudData.secure_url) {
+        setValue("voice_url", cloudData.secure_url);
+        setSuccess("✅ Audio uploaded. Now extracting complaint details...");
       } else {
-        console.error("Cloudinary response:", data);
+        console.error("Cloudinary response:", cloudData);
         setError("Failed to upload issue audio.");
+        speak("Failed to upload audio. Please try again.");
+        return;
       }
     } catch (err) {
       console.error("Audio upload failed:", err);
       setError("Failed to upload issue audio.");
+      speak("Failed to upload audio. Please try again.");
+      return;
+    }
+
+    // 2. Auto-fill form fields from voice using NLP
+    setIsExtracting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
+      const audioBase64 = await blobToBase64(blob);
+
+      const extractRes = await fetch(
+        `${API_BASE}/api/transcribe/extract-fields`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            audio_base64: audioBase64,
+            audio_mime: blob.type,
+          }),
+        }
+      );
+
+      const extractData = await extractRes.json();
+
+      if (extractRes.ok && extractData.fields) {
+        const { title, description, category, priority } = extractData.fields;
+
+        setValue("title", title);
+        setValue("description", description);
+        setValue("category", category);
+        setValue("priority", priority);
+
+        setAutoFilled(true);
+        const msg = `Form auto-filled from your voice! Title: ${title}. Category: ${category}. Priority: ${priority}. You can review and edit the fields below.`;
+        setSuccess(`🤖 ${msg}`);
+        speak(msg);
+      } else {
+        console.error("Field extraction failed:", extractData);
+        setSuccess(
+          "✅ Audio uploaded, but auto-fill could not extract fields. Please fill the form manually."
+        );
+        speak(
+          "Audio uploaded successfully, but I could not extract details from your speech. Please fill the form manually."
+        );
+      }
+    } catch (err) {
+      console.error("Field extraction error:", err);
+      setSuccess(
+        "✅ Audio uploaded, but auto-fill failed. Please fill the form manually."
+      );
+      speak(
+        "Audio uploaded successfully, but auto-fill failed. Please fill the form manually."
+      );
+    } finally {
+      setIsExtracting(false);
     }
   };
-  
-  // Location detection (Kept as is)
+
+  // -------------------------------------------------------
+  // Auto-categorize from typed description
+  // -------------------------------------------------------
+  const handleAutoCategorize = async () => {
+    const description = watch("description");
+    if (!description || description.trim().length < 10) {
+      const msg = "Please enter a longer description first (at least 10 characters).";
+      setError(msg);
+      speak(msg);
+      return;
+    }
+
+    setIsExtracting(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
+      const res = await fetch(`${API_BASE}/api/transcribe/extract-fields`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: description }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.fields) {
+        setValue("category", data.fields.category);
+        setValue("priority", data.fields.priority);
+        if (!watch("title") || watch("title").trim() === "") {
+          setValue("title", data.fields.title);
+        }
+        const msg = `Auto-suggested: Category is ${data.fields.category}, Priority is ${data.fields.priority}.`;
+        setSuccess(`🤖 ${msg}`);
+        speak(msg);
+      } else {
+        setError("Could not auto-categorize. Please select manually.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Auto-categorize failed. Please select manually.");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // -------------------------------------------------------
+  // Location detection
+  // -------------------------------------------------------
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation not supported by your browser.");
@@ -337,13 +430,22 @@ export default function ReportForm() {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         } as any);
+        speak("Location detected successfully.");
       },
-      () => setError("Failed to fetch location.")
+      () => {
+        const msg = "Failed to fetch location.";
+        setError(msg);
+        speak(msg);
+      }
     );
   };
 
-  // Photo upload (Kept as is)
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // -------------------------------------------------------
+  // Photo upload
+  // -------------------------------------------------------
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -354,87 +456,23 @@ export default function ReportForm() {
     try {
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/diqacdink/image/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
+        { method: "POST", body: formData }
       );
 
       const data = await res.json();
       setValue("photo_url", data.secure_url);
+      speak("Photo uploaded successfully.");
     } catch (error) {
       console.error("Upload error:", error);
       setError("Photo upload failed.");
+      speak("Photo upload failed.");
     }
   };
 
-const handleVoiceRecording = async () => {
-    setError("");
-    if (recording) {
-      mediaRecorderRef.current?.stop();
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        try {
-          const blob = new Blob(chunks, { type: "audio/webm" });
-          const url = URL.createObjectURL(blob);
-          setRecordedAudio(url);
-
-          const formData = new FormData();
-          formData.append("file", blob);
-          formData.append("upload_preset", "unsigned_preset");
-
-          const res = await fetch(
-            `https://api.cloudinary.com/v1_1/diqacdink/video/upload`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          const data = await res.json();
-          if (data && data.secure_url) {
-            setValue("voice_url", data.secure_url);
-          } else {
-            console.error("Cloudinary response:", data);
-            setError("Failed to upload audio.");
-          }
-        } catch (err) {
-          console.error("Audio upload failed:", err);
-          setError("Failed to upload audio.");
-        } finally {
-          if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-            mediaStreamRef.current = null;
-          }
-          mediaRecorderRef.current = null;
-          setRecording(false);
-        }
-      };
-
-      recorder.start();
-      setRecording(true);
-    } catch (err) {
-      console.error("Microphone error:", err);
-      setError("Microphone access denied or not available.");
-      setRecording(false);
-    }
-  };
-
-const onSubmit = async (data: ReportFormData) => {
+  // -------------------------------------------------------
+  // Form submission
+  // -------------------------------------------------------
+  const onSubmit = async (data: ReportFormData) => {
     setError("");
     setSuccess("");
     setRedirecting(false);
@@ -461,27 +499,37 @@ const onSubmit = async (data: ReportFormData) => {
 
       const result = await res.json();
       if (!res.ok) {
-        setError(result.error || "Failed to submit issue");
+        const msg = result.error || "Failed to submit issue";
+        setError(msg);
+        speak(msg);
         return;
       }
 
-      setSuccess("✅ Issue reported successfully!");
+      const msg =
+        "Your complaint has been submitted successfully! Redirecting to dashboard.";
+      setSuccess(`✅ ${msg}`);
+      speak(msg);
 
-      // ✅ Redirect after short delay
       setTimeout(() => {
         setRedirecting(true);
-        router.push("/dashboard/citizen"); // 🔁 change route if needed
-      }, 1500);
+        router.push("/dashboard/citizen");
+      }, 2500);
     } catch {
-      setError("Server error. Please try again later.");
+      const msg = "Server error. Please try again later.";
+      setError(msg);
+      speak(msg);
     }
   };
-  // Helper to determine if the verification button should be disabled
-  const isVerificationButtonDisabled = isVerifying || (recording && !activeRecorderRef.current?.isVerification);
 
-  // Helper to determine if the issue button should be disabled
-  const isIssueButtonDisabled = !isVerified || isVerifying || (recording && activeRecorderRef.current?.isVerification);
+  // Helper for button disabled states
+  const isVerificationButtonDisabled =
+    isVerifying || (recording && !activeRecorderRef.current?.isVerification);
 
+  const isIssueButtonDisabled =
+    !isVerified ||
+    isVerifying ||
+    isExtracting ||
+    (recording && activeRecorderRef.current?.isVerification);
 
   return (
     <div
@@ -537,90 +585,139 @@ const onSubmit = async (data: ReportFormData) => {
         />
       </svg>
 
-      {/* bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-blue-200/50 */}
       <div className="bg-white/80 backdrop-blur-lg border border-blue-200/40 shadow-2xl rounded-3xl p-10 w-full max-w-2xl transition-transform hover:scale-[1.01] duration-200">
-        {/* text-3xl font-bold text-blue-700 mb-6 text-center */}
         <h2 className="text-4xl font-extrabold text-center mb-8 bg-clip-text text-blue-700">
           📝 Report an Issue
         </h2>
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium">Description</label>
-          <textarea {...register("description")} rows={4} className="w-full p-2 border border-gray-300 rounded" />
-          {errors.description && <p className="text-red-500 text-sm">{errors.description.message}</p>}
-        </div>
-        
-        {/* --- VOICE AUTHENTICATION SECTION --- */}
-        <hr className="my-4" />
-        <div className="space-y-3">
-            <h3 className="text-lg font-bold text-gray-800">Voice Verification</h3>
-            <p className="text-sm text-gray-600">
-                To enable voice recording for the issue, please speak the exact phrase: 
-                <span className="font-semibold text-blue-600 ml-1">"{VERIFICATION_PHRASE}"</span>
-            </p>
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={handleVerificationRecording}
-                    // 💡 FIX: Use the calculated helper function. Enabled when recording, or when ready to start.
-                    disabled={isVerificationButtonDisabled} 
-                    className={`px-4 py-2 rounded ${
-                        isVerified ? "bg-green-600" : isVerifying || (recording && activeRecorderRef.current?.isVerification) ? "bg-red-600" : "bg-blue-600"
-                    } text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
-                >
-                    {isVerified ? (
-                        "✅ Verified"
-                    ) : isVerifying ? (
-                        <>
-                            <Loader2 className="animate-spin h-4 w-4" />
-                            Verifying...
-                        </>
-                    ) : (recording && activeRecorderRef.current?.isVerification) ? (
-                        "Stop Speaking"
-                    ) : (
-                        "Start Verification"
-                    )}
-                </button>
-                {verificationAudioUrl && (
-                    <audio controls src={verificationAudioUrl} className="mt-2 w-full max-w-xs" />
-                )}
+
+        {/* --- STEP 1: VOICE IDENTITY VERIFICATION --- */}
+        <div className="space-y-3 mb-4">
+          <h3 className="text-lg font-bold text-gray-800">
+            🔐 Step 1: Voice Identity Verification
+          </h3>
+          <p className="text-sm text-gray-600">
+            Speak into your microphone to verify your identity. Your voice will
+            be compared against your registered voice sample using biometric
+            analysis.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleVerificationRecording}
+              disabled={isVerificationButtonDisabled}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                isVerified
+                  ? "bg-green-600"
+                  : isVerifying ||
+                    (recording && activeRecorderRef.current?.isVerification)
+                  ? "bg-red-600 animate-pulse"
+                  : "bg-blue-600 hover:bg-blue-700"
+              } text-white disabled:opacity-50 flex items-center gap-2`}
+            >
+              {isVerified ? (
+                "✅ Verified"
+              ) : isVerifying ? (
+                <>
+                  <Loader2 className="animate-spin h-4 w-4" />
+                  Verifying...
+                </>
+              ) : recording && activeRecorderRef.current?.isVerification ? (
+                "⏹️ Stop Speaking"
+              ) : (
+                "🎙️ Start Verification"
+              )}
+            </button>
+            {verificationAudioUrl && (
+              <audio
+                controls
+                src={verificationAudioUrl}
+                className="w-full max-w-xs h-10"
+              />
+            )}
+          </div>
+
+          {/* Verification details */}
+          {verificationScore !== null && (
+            <div
+              className={`text-xs p-2 rounded ${
+                isVerified
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
+              <p>
+                Similarity Score:{" "}
+                <strong>{(verificationScore * 100).toFixed(1)}%</strong>
+                {verificationScore > 0.75 ? " ✓" : " ✗"}
+              </p>
+              {replayDetected && (
+                <p className="text-red-600 font-semibold mt-1">
+                  ⚠️ Replay attack detected — please speak live!
+                </p>
+              )}
             </div>
+          )}
         </div>
+
         <hr className="my-4" />
-        
-        {/* --- VOICE RECORDING FOR ISSUE --- */}
-        <div>
-          <label className="block text-sm font-medium">Voice Message (optional)</label>
-          <div className="flex items-center gap-2">
+
+        {/* --- STEP 2: RECORD YOUR COMPLAINT --- */}
+        <div className="space-y-3 mb-4">
+          <h3 className="text-lg font-bold text-gray-800">
+            🎤 Step 2: Record Your Complaint
+          </h3>
+          <p className="text-sm text-gray-600">
+            {isVerified
+              ? "Describe your civic issue by speaking. The system will automatically fill the form with your complaint details."
+              : "Please complete voice verification first (Step 1) before recording your issue."}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={handleIssueRecording}
-              // 💡 FIX: Use the calculated helper function.
-              disabled={isIssueButtonDisabled} 
-              className={`px-4 py-2 rounded ${
-                (recording && !activeRecorderRef.current?.isVerification) ? "bg-red-600" : isVerified ? "bg-blue-600" : "bg-gray-400"
-              } text-white hover:opacity-90 disabled:opacity-50`}
+              disabled={isIssueButtonDisabled}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                recording && !activeRecorderRef.current?.isVerification
+                  ? "bg-red-600 animate-pulse"
+                  : isVerified
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              } text-white disabled:opacity-50 flex items-center gap-2`}
             >
-              {(recording && !activeRecorderRef.current?.isVerification) ? "Stop Recording" : "Record Issue Voice"}
+              {isExtracting ? (
+                <>
+                  <Loader2 className="animate-spin h-4 w-4" />
+                  Processing...
+                </>
+              ) : recording && !activeRecorderRef.current?.isVerification ? (
+                "⏹️ Stop Recording"
+              ) : (
+                "🎙️ Record Issue Voice"
+              )}
             </button>
 
-            {recordedAudio && <audio controls src={recordedAudio} className="mt-2 w-full" />}
+            {recordedAudio && (
+              <audio controls src={recordedAudio} className="w-full max-w-xs h-10" />
+            )}
           </div>
-        </div>
-        
-        {/* Category */}
-        <div>
-          <label className="block text-sm font-medium">Category</label>
-          <select {...register("category")} className="w-full p-2 border border-gray-300 rounded">
-            <option value="">Select Category</option>
-            <option value="Sanitation">Sanitation</option>
-            <option value="Roads">Roads</option>
-            <option value="Electricity">Electricity</option>
-          </select>
-          {errors.category && <p className="text-red-500 text-sm">{errors.category.message}</p>}
+
+          {/* Auto-fill indicator */}
+          {autoFilled && (
+            <div className="text-xs p-2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+              🤖 Form fields were auto-filled from your voice recording. You can
+              review and edit them below.
+            </div>
+          )}
         </div>
 
+        <hr className="my-4" />
+
+        {/* --- STEP 3: REVIEW & SUBMIT FORM --- */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <h3 className="text-lg font-bold text-gray-800">
+            📋 Step 3: Review & Submit
+          </h3>
+
           {/* Title */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -656,20 +753,33 @@ const onSubmit = async (data: ReportFormData) => {
             )}
           </div>
 
-          {/* Category */}
+          {/* Category with Auto-suggest button */}
           <div>
             <label className="block text-sm font-semibold text-[#78716c] mb-1">
               Category
             </label>
-            <select
-              {...register("category")}
-              className="w-full p-3 text-[#171717] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white"
-            >
-              <option value="">Select Category</option>
-              <option value="Sanitation">Sanitation</option>
-              <option value="Roads">Roads</option>
-              <option value="Electricity">Electricity</option>
-            </select>
+            <div className="flex gap-2 items-center">
+              <input
+                {...register("category")}
+                className="flex-1 p-3 text-[#171717] border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none placeholder-gray-400 bg-white"
+                placeholder="Category (e.g., Waste, Roads, Parks)"
+              />
+              <button
+                type="button"
+                onClick={handleAutoCategorize}
+                disabled={isExtracting}
+                className="px-3 py-2 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
+              >
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="animate-spin h-3 w-3" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "🤖 Auto-suggest"
+                )}
+              </button>
+            </div>
             {errors.category && (
               <p className="text-red-500 text-sm mt-1">
                 {errors.category.message}
@@ -725,65 +835,36 @@ const onSubmit = async (data: ReportFormData) => {
             />
           </div>
 
-          {/* Voice Recording */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Voice Message (optional)
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleVoiceRecording}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  recording
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                {recording ? "⏹ Stop Recording" : " Record Voice"}
-              </button>
-              {recordedAudio && (
-                <audio controls src={recordedAudio} className="mt-2 w-full" />
-              )}
-            </div>
-          </div>
-
           {/* Error / Success */}
-          {error && (
-            <p className="text-red-600 text-sm font-medium text-center">
-              {error}
-            </p>)}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {success && <p className="text-green-600 text-sm">{success}</p>}
 
-        {/* Photo Upload */}
-        <div>
-          <label className="block text-sm font-medium">Upload Photo</label>
-          <input type="file" accept="image/*" onChange={handleFileUpload} className="w-full p-2 border border-gray-300 rounded" />
-        </div>
-        
-        {/* Error / Success */}
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        {success && <p className="text-green-600 text-sm">{success}</p>}
+          {/* Submit Button */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting || redirecting}
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition-all duration-200 flex items-center justify-center"
+            >
+              {isSubmitting || redirecting ? (
+                <>
+                  <Loader2 className="animate-spin h-5 w-5 mr-2" />{" "}
+                  Submitting...
+                </>
+              ) : (
+                "Submit Issue"
+              )}
+            </button>
 
-        {/* Submit */}
-        <button 
-            type="submit" 
-            disabled={isSubmitting || (Boolean(currentVoiceUrl) && !isVerified)} 
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="animate-spin h-5 w-5" />
-              Submitting...
-            </>
-          ) : (
-            "Submit Issue"
-          )}
-          {success && (
-            <p className="text-green-600 text-sm font-medium text-center">
-              {success}
-            </p>
-          )}
-          </button>
+            {/* Dashboard Button */}
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/citizen")}
+              className="w-full sm:w-auto px-6 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-lg shadow transition-all duration-200"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         </form>
       </div>
     </div>

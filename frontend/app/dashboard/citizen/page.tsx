@@ -367,8 +367,17 @@ export default function DashboardPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-800">My Reports</h2>
-            <div className="text-sm text-gray-500">
-              {filteredIssues.length} total
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-500">
+                {filteredIssues.length} total
+              </div>
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md 
+                        hover:bg-blue-700 transition-all duration-200"
+                onClick={() => router.push("/report-issue")}
+              >
+                Report Issue
+              </button>
             </div>
           </div>
 
@@ -452,7 +461,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 p-3 overflow-y-auto text-sm space-y-2 bg-gray-50 text-gray-900">
-              {messages.map((msg : any, i) => (
+              {messages.map((msg: any, i) => (
                 <div
                   key={i}
                   className={`p-2 rounded-lg text-sm max-w-[80%] ${
